@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mausam - India Weather Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    backdropBlur: {
+                        xs: '2px',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            transition: background 1s ease-in-out;
+        }
+        /* Custom styled scrollbar for a premium look */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+        /* Glassmorphism Classes */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+        .glass-input {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .glass-pill {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .glass-pill-active {
+            background: rgba(255, 255, 255, 0.8);
+            color: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.9);
+        }
+        
+        /* Background animations */
+        #weather-bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Weather state gradients */
+        .theme-sunny {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311005 100%);
+        }
+        .theme-cloudy {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+        }
+        .theme-rainy {
+            background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #172554 100%);
+        }
+        .theme-foggy {
+            background: linear-gradient(135deg, #090d16 0%, #1e293b 60%, #475569 100%);
+        }
+        .theme-stormy {
+            background: linear-gradient(135deg, #020617 0%, #0c0a09 50%, #111827 100%);
+        }
+        .theme-snowy {
+            background: linear-gradient(135deg, #030712 0%, #111827 50%, #1e1b4b 100%);
+        }
+    </style>
+</head>
+<body class="theme-sunny text-white min-h-screen flex flex-col relative pb-12">
+    <!-- Dynamic canvas rendering falling precipitation/winds -->
+    <canvas id="weather-bg-canvas"></canvas>
+
+    <!-- Navigation Header -->
+    <header class="border-b border-white/10 backdrop-blur-md sticky top-0 z-40 bg-slate-950/20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Branding / Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-amber-500/20 text-amber-400 p-2 rounded-xl flex items-center justify-center border border-amber-500/30">
+                        <i class="fa-solid fa-cloud-sun-rain text-2xl"></i>
+                    </div>
+                    <div>
+                        <span class="font-black text-2xl tracking-tight text-white flex items-center gap-2">
+                            Mausam <span class="text-xs bg-amber-500/20 border border-amber-500/30 text-amber-400 font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider">India</span>
+                        </span>
+                        <span class="text-[10px] block text-white/60 font-medium">Real-time Weather & Insights</span>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <div class="flex items-center space-x-1 sm:space-x-3">
+                    <button onclick="switchTab('dashboard-tab')" id="nav-dashboard-tab" class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-medium text-xs sm:text-sm glass-pill-active transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Dashboard</span>
+                    </button>
+                    <button onclick="switchTab('compare-tab')" id="nav-compare-tab" class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-medium text-xs sm:text-sm text-white/80 hover:bg-white/10 transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-code-compare"></i>
+                        <span>Compare</span>
+                    </button>
+                    <button onclick="switchTab('radar-tab')" id="nav-radar-tab" class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-medium text-xs sm:text-sm text-white/80 hover:bg-white/10 transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-map"></i>
+                        <span>Live India Map</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-10">
+        
+        <!-- Search, Geocode, & Preset Indian City Cards Panel -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+            <!-- Left search bar section -->
+            <div class="lg:col-span-3 flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-grow">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-white/40"></i>
+                    <input type="text" id="city-search-input" onkeydown="handleSearchKey(event)" class="w-full glass-input rounded-2xl pl-12 pr-4 py-3.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-white/30 transition" placeholder="Search any city or district in India (e.g., Srinagar, Dehradun, Ooty, Guwahati)...">
+                    
+                    <!-- Search Autocomplete Suggestions dropdown -->
+                    <div id="autocomplete-dropdown" class="hidden absolute left-0 right-0 mt-2 bg-slate-900/95 border border-white/15 rounded-xl shadow-2xl overflow-hidden z-50">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+                <button onclick="searchManualCity()" class="bg-white hover:bg-slate-200 text-slate-900 font-semibold text-sm px-6 py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2">
+                    <span>Get Weather</span>
+                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Locate button utilizing browser GeoLocation -->
+            <div class="flex">
+                <button onclick="locateUserGeo()" class="w-full bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 font-semibold text-sm px-4 py-3.5 rounded-2xl border border-blue-500/30 shadow-md transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-location-crosshairs animate-pulse"></i>
+                    <span>Locate My Position</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Curated Preset Indian Cities Scroller -->
+        <div class="mb-8">
+            <h3 class="text-xs font-bold text-white/60 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                <i class="fa-solid fa-fire text-amber-500"></i>
+                Major Indian Hubs
+            </h3>
+            <div class="flex items-center gap-3 overflow-x-auto pb-3 -mx-4 px-4 sm:mx-0 sm:px-0" id="preset-cities-scroller">
+                <!-- Preset chips loaded by JS: Mumbai, Delhi, Bangalore, Kolkata, Chennai, Guwahati, Srinagar, Kochi -->
+            </div>
+        </div>
+
+        <!-- TAB 1: Live Dashboard Panel -->
+        <section id="dashboard-tab" class="tab-content block space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Left Dashboard Column: Main Temperature & Hero Overview -->
+                <div class="lg:col-span-1 space-y-6">
+                    <!-- Live Weather Card -->
+                    <div class="glass-card rounded-3xl p-6 relative overflow-hidden flex flex-col justify-between min-h-[360px]">
+                        <!-- Background glow effect matching weather icon -->
+                        <div id="glow-circle" class="absolute -right-20 -bottom-20 w-56 h-56 rounded-full bg-amber-500/20 blur-3xl pointer-events-none"></div>
+
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h2 id="hero-city-name" class="text-3xl font-bold tracking-tight">New Delhi</h2>
+                                <p id="hero-state-region" class="text-xs text-white/60 font-medium">National Capital Territory</p>
+                            </div>
+                            <span id="hero-live-badge" class="bg-emerald-500/20 text-emerald-300 text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live
+                            </span>
+                        </div>
+
+                        <div class="my-8 flex items-end justify-between">
+                            <div>
+                                <div class="flex items-start">
+                                    <span id="hero-temp" class="text-7xl font-black tracking-tighter">32</span>
+                                    <span class="text-3xl font-semibold mt-1">°C</span>
+                                </div>
+                                <div class="flex items-center space-x-2 text-sm text-white/80 mt-1">
+                                    <span id="hero-temp-range" class="font-medium">H: 36° L: 24°</span>
+                                    <span>•</span>
+                                    <span id="hero-feels-like">Feels like 34°</span>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <i id="hero-weather-icon" class="fa-solid fa-cloud-sun text-6xl text-amber-400 drop-shadow-[0_4px_12px_rgba(251,191,36,0.3)] block"></i>
+                                <span id="hero-condition-desc" class="text-sm font-semibold block mt-2 text-white/90">Partly Cloudy</span>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-white/10 pt-4 flex justify-between items-center text-xs text-white/50">
+                            <span>Timezone: <b id="hero-timezone-text" class="text-white/80">Asia/Kolkata</b></span>
+                            <span id="hero-local-time">Checked just now</span>
+                        </div>
+                    </div>
+
+                    <!-- Additional Atmospheric Indices Grid -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Humidity Card -->
+                        <div class="glass-card rounded-2xl p-4 flex flex-col justify-between">
+                            <div class="flex justify-between items-center text-white/60">
+                                <span class="text-xs font-semibold uppercase tracking-wider">Humidity</span>
+                                <i class="fa-solid fa-droplet text-blue-400"></i>
+                            </div>
+                            <div class="mt-4">
+                                <div id="index-humidity" class="text-2xl font-bold">64%</div>
+                                <p class="text-[10px] text-white/50 mt-1">Moderate water vapor</p>
+                            </div>
+                        </div>
+
+                        <!-- Wind Speed Card -->
+                        <div class="glass-card rounded-2xl p-4 flex flex-col justify-between">
+                            <div class="flex justify-between items-center text-white/60">
+                                <span class="text-xs font-semibold uppercase tracking-wider">Wind</span>
+                                <i class="fa-solid fa-wind text-teal-300"></i>
+                            </div>
+                            <div class="mt-4">
+                                <div id="index-wind" class="text-2xl font-bold">14 km/h</div>
+                                <p id="index-wind-direction" class="text-[10px] text-white/50 mt-1">Northwest (310°)</p>
+                            </div>
+                        </div>
+
+                        <!-- UV Index Card -->
+                        <div class="glass-card rounded-2xl p-4 flex flex-col justify-between">
+                            <div class="flex justify-between items-center text-white/60">
+                                <span class="text-xs font-semibold uppercase tracking-wider">UV Index</span>
+                                <i class="fa-solid fa-sun text-amber-400"></i>
+                            </div>
+                            <div class="mt-4">
+                                <div id="index-uv" class="text-2xl font-bold">6.8</div>
+                                <p id="index-uv-risk" class="text-[10px] text-white/50 mt-1">High Risk (Shield)</p>
+                            </div>
+                        </div>
+
+                        <!-- Rain Probability Card -->
+                        <div class="glass-card rounded-2xl p-4 flex flex-col justify-between">
+                            <div class="flex justify-between items-center text-white/60">
+                                <span class="text-xs font-semibold uppercase tracking-wider">Rain chance</span>
+                                <i class="fa-solid fa-cloud-showers-heavy text-indigo-400"></i>
+                            </div>
+                            <div class="mt-4">
+                                <div id="index-precipitation" class="text-2xl font-bold">15%</div>
+                                <p class="text-[10px] text-white/50 mt-1">Slight cloud humidity</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center/Right Dashboard Column: Hourly Swiper, Metrics, 7-Day Forecast -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Hourly Forecast Slider -->
+                    <div class="glass-card rounded-3xl p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-sm uppercase tracking-wider text-white/80 flex items-center gap-1.5">
+                                <i class="fa-regular fa-clock text-amber-400"></i>
+                                Hourly Temperature Curve (24 Hours)
+                            </h3>
+                            <span class="text-[10px] text-white/50">Horizontal Scroll <i class="fa-solid fa-angles-right"></i></span>
+                        </div>
+                        <div class="flex space-x-4 overflow-x-auto pb-4" id="hourly-forecast-container">
+                            <!-- Populated dynamically by JS -->
+                        </div>
+                    </div>
+
+                    <!-- 7-Day Forecast Card -->
+                    <div class="glass-card rounded-3xl p-6">
+                        <h3 class="font-bold text-sm uppercase tracking-wider text-white/80 flex items-center gap-1.5 mb-4">
+                            <i class="fa-solid fa-calendar-days text-emerald-400"></i>
+                            Extended Weekly Forecast
+                        </h3>
+                        <div class="divide-y divide-white/10 space-y-3" id="weekly-forecast-container">
+                            <!-- Populated dynamically by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Weather Advice Card (Based on dynamic variables) -->
+                    <div class="glass-card rounded-2xl p-5 border border-amber-500/20 bg-amber-500/5">
+                        <div class="flex items-start gap-4">
+                            <div class="bg-amber-400/20 text-amber-300 p-2.5 rounded-xl border border-amber-500/30 flex items-center justify-center">
+                                <i class="fa-regular fa-lightbulb text-lg"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-sm text-amber-300 mb-1">Mausam Travel & Health Advisor</h4>
+                                <p id="weather-recommendation-text" class="text-xs text-white/80 leading-relaxed">
+                                    Loading dynamic local suggestions... Setup a city to receive tailored Indian seasonal insights regarding air travel delays, agricultural advisory, and city outings.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: Compare Panel -->
+        <section id="compare-tab" class="tab-content hidden space-y-6">
+            <div class="glass-card rounded-3xl p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold">Compare Weather Across India</h2>
+                        <p class="text-xs text-white/60">Pick multiple Indian cities to map out current conditions, temperatures, humidity thresholds, and wind dynamics side-by-side.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="addCityToCompare('Delhi')" class="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition">+ New Delhi</button>
+                        <button onclick="addCityToCompare('Mumbai')" class="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition">+ Mumbai</button>
+                        <button onclick="addCityToCompare('Bengaluru')" class="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition">+ Bengaluru</button>
+                        <button onclick="addCityToCompare('Kolkata')" class="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition">+ Kolkata</button>
+                        <button onclick="addCityToCompare('Guwahati')" class="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg transition">+ Guwahati</button>
+                    </div>
+                </div>
+
+                <!-- Custom selector within the compare panel -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="md:col-span-2 relative">
+                        <i class="fa-solid fa-plus absolute left-4 top-1/2 -translate-y-1/2 text-white/40"></i>
+                        <input type="text" id="compare-city-input" onkeydown="handleCompareKey(event)" class="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-xs placeholder-white/40 outline-none focus:ring-1 focus:ring-white/20 text-white" placeholder="Type city name and press Enter to append to the dashboard comparison grid...">
+                    </div>
+                    <button onclick="manualCompareAdd()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-3 rounded-xl transition">
+                        Add to Matrix
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse text-left text-sm">
+                        <thead>
+                            <tr class="border-b border-white/10 text-white/60 text-xs font-semibold uppercase tracking-wider">
+                                <th class="py-3 px-4">Indian City</th>
+                                <th class="py-3 px-4">Weather Aspect</th>
+                                <th class="py-3 px-4">Temp</th>
+                                <th class="py-3 px-4">Feels Like</th>
+                                <th class="py-3 px-4">Humidity</th>
+                                <th class="py-3 px-4">Wind Rate</th>
+                                <th class="py-3 px-4">Cloud Cover</th>
+                                <th class="py-3 px-4 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="compare-matrix-rows" class="divide-y divide-white/5">
+                            <!-- Dynamic Rows loaded by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: Simulated Live Satellite Map Radar -->
+        <section id="radar-tab" class="tab-content hidden space-y-6">
+            <div class="glass-card rounded-3xl p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-satellite text-indigo-400"></i>
+                            Live Simulated India Thermal Grid
+                        </h2>
+                        <p class="text-xs text-white/60">A dynamic interactive Canvas model representing thermal variances, jetstream curves, and real-time radar echoes across coordinate zones of the Indian subcontinent.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleRadarGrid()" class="px-3 py-1.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-semibold text-xs border border-indigo-500/30 rounded-xl transition">
+                            Toggle Isobar Isobars
+                        </button>
+                        <button onclick="triggerRadarPulse()" class="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 font-semibold text-xs border border-emerald-500/30 rounded-xl transition">
+                            Simulate Doppler Sweep
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <!-- Left Legend -->
+                    <div class="lg:col-span-1 space-y-6 flex flex-col justify-between">
+                        <div class="glass-card rounded-2xl p-4 space-y-4">
+                            <h4 class="font-bold text-xs uppercase tracking-wider text-white/60">Radar Parameter Index</h4>
+                            <div class="space-y-3 text-xs">
+                                <div class="flex justify-between items-center">
+                                    <span>Radar Signal Range</span>
+                                    <span class="font-bold text-emerald-400">820 km (Doppler)</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span>WMO Calibration</span>
+                                    <span class="font-bold text-white/80">Active</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span>Monsoon Drift Tracking</span>
+                                    <span class="font-bold text-blue-400">Westerly / SW</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Thermal spectrum legends -->
+                        <div class="glass-card rounded-2xl p-4 space-y-3">
+                            <h4 class="font-bold text-xs uppercase tracking-wider text-white/60">Temperature Spectrum</h4>
+                            <div class="space-y-2">
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="w-4 h-3 bg-red-600 rounded"></span>
+                                    <span>Extremely Warm (38°C+)</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="w-4 h-3 bg-orange-500 rounded"></span>
+                                    <span>Moderate Summer (30°C - 37°C)</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="w-4 h-3 bg-emerald-500 rounded"></span>
+                                    <span>Pleasant / Temperate (22°C - 29°C)</span>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="w-4 h-3 bg-blue-500 rounded"></span>
+                                    <span>Cool High Altitude (Below 21°C)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-2xl text-xs space-y-2">
+                            <h5 class="font-bold text-indigo-300">Tip: Subcontinent Geophysics</h5>
+                            <p class="text-white/75 leading-relaxed">The Himalayan wall blocks cold Siberian winds, retaining subcontinental heat. Dynamic coastal breezes maintain high ambient humidity in the peninsula.</p>
+                        </div>
+                    </div>
+
+                    <!-- Right interactive visualizer -->
+                    <div class="lg:col-span-3 glass-card rounded-3xl p-4 flex justify-center items-center relative overflow-hidden bg-slate-950/40">
+                        <canvas id="india-radar-canvas" class="w-full max-w-2xl h-auto border border-white/5 rounded-2xl bg-slate-950"></canvas>
+                        <!-- Floating metrics overlay -->
+                        <div class="absolute bottom-6 left-6 bg-slate-900/90 border border-white/10 p-3 rounded-xl backdrop-blur-md text-[10px] space-y-1">
+                            <div>Interactive coordinates: <b id="radar-coordinate-display">Hover over the map</b></div>
+                            <div>Dynamic Doppler status: <span class="text-emerald-400 font-semibold animate-pulse">SWEEPING</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Global Toast Alert Banner -->
+    <div id="mausam-toast" class="fixed bottom-6 right-6 bg-slate-900 border border-white/15 text-white px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-24 opacity-0 z-50 flex items-center space-x-3 text-xs max-w-sm">
+        <span id="toast-icon-wrapper" class="text-amber-400 text-lg">
+            <i class="fa-solid fa-circle-exclamation"></i>
+        </span>
+        <div>
+            <p id="toast-message-body" class="font-medium">Adjusted your weather metrics successfully.</p>
+        </div>
+    </div>
+
+    <!-- Application Script Block -->
+    <script>
+        // Core presets of major Indian Cities
+        const presetCities = [
+            { name: "New Delhi", lat: 28.6139, lon: 77.2090, region: "North Zone" },
+            { name: "Mumbai", lat: 19.0760, lon: 72.8777, region: "West Coast" },
+            { name: "Bengaluru", lat: 12.9716, lon: 77.5946, region: "Deccan Plateau" },
+            { name: "Kolkata", lat: 22.5726, lon: 88.3639, region: "East Coast" },
+            { name: "Chennai", lat: 13.0827, lon: 80.2707, region: "Coromandel Coast" },
+            { name: "Guwahati", lat: 26.1158, lon: 91.7086, region: "Northeast" },
+            { name: "Srinagar", lat: 34.0837, lon: 74.7973, region: "Kashmir Valley" },
+            { name: "Kochi", lat: 9.9312, lon: 76.2673, region: "Malabar Coast" }
+        ];
+
+        // Global Application State Configuration
+        let appState = {
+            currentTab: 'dashboard-tab',
+            currentCity: {
+                name: "New Delhi",
+                lat: 28.6139,
+                lon: 77.2090,
+                region: "National Capital Territory"
+            },
+            compareCities: ["Mumbai", "Bengaluru", "Srinagar"],
+            radarShowGrid: true,
+            radarSweepProgress: 0,
+            weatherCodeDetails: {}
+        };
+
+        // Open-Meteo Weather Codes Decoder
+        const weatherCodes = {
+            0: { desc: "Sunny & Clear", icon: "fa-sun", theme: "sunny", particles: "sun" },
+            1: { desc: "Mainly Clear", icon: "fa-cloud-sun", theme: "sunny", particles: "sun" },
+            2: { desc: "Partly Cloudy", icon: "fa-cloud-sun", theme: "cloudy", particles: "clouds" },
+            3: { desc: "Overcast", icon: "fa-cloud", theme: "cloudy", particles: "clouds" },
+            45: { desc: "Foggy Mist", icon: "fa-smog", theme: "foggy", particles: "fog" },
+            48: { desc: "Rime Fog", icon: "fa-smog", theme: "foggy", particles: "fog" },
+            51: { desc: "Light Drizzle", icon: "fa-cloud-rain", theme: "rainy", particles: "rain" },
+            53: { desc: "Moderate Drizzle", icon: "fa-cloud-rain", theme: "rainy", particles: "rain" },
+            55: { desc: "Dense Drizzle", icon: "fa-cloud-rain", theme: "rainy", particles: "rain" },
+            61: { desc: "Slight Rain", icon: "fa-cloud-showers-heavy", theme: "rainy", particles: "rain" },
+            63: { desc: "Moderate Rain", icon: "fa-cloud-showers-heavy", theme: "rainy", particles: "rain" },
+            65: { desc: "Heavy Downpour", icon: "fa-cloud-showers-heavy", theme: "rainy", particles: "rain" },
+            71: { desc: "Light Snow", icon: "fa-snowflake", theme: "snowy", particles: "snow" },
+            73: { desc: "Moderate Snow", icon: "fa-snowflake", theme: "snowy", particles: "snow" },
+            75: { desc: "Heavy Snow", icon: "fa-snowflake", theme: "snowy", particles: "snow" },
+            80: { desc: "Slight Rain Showers", icon: "fa-cloud-sun-rain", theme: "rainy", particles: "rain" },
+            81: { desc: "Moderate Rain Showers", icon: "fa-cloud-showers-heavy", theme: "rainy", particles: "rain" },
+            82: { desc: "Violent Cloudburst", icon: "fa-cloud-showers-water", theme: "stormy", particles: "rain" },
+            95: { desc: "Thunderstorm", icon: "fa-cloud-bolt", theme: "stormy", particles: "storm" },
+            96: { desc: "Storm with Hail", icon: "fa-cloud-meatball", theme: "stormy", particles: "storm" }
+        };
+
+        // Window load initializer
+        window.onload = function() {
+            renderPresetCities();
+            fetchWeatherData(appState.currentCity);
+            setupWeatherBackground();
+            setupIndiaRadar();
+            
+            // Listen for window resize to scale canvas frames properly
+            window.addEventListener('resize', () => {
+                resizeWeatherCanvas();
+                resizeRadarCanvas();
+            });
+        };
+
+        // Render Preset City Buttons Scroll Section
+        function renderPresetCities() {
+            const scroller = document.getElementById("preset-cities-scroller");
+            scroller.innerHTML = "";
+            
+            presetCities.forEach(city => {
+                const chip = document.createElement("button");
+                chip.onclick = () => selectPresetCity(city);
+                
+                // Add conditional visual highlights to indicate active selector state
+                const isActive = appState.currentCity.name.toLowerCase() === city.name.toLowerCase();
+                chip.className = `flex-shrink-0 px-4 py-2.5 rounded-2xl text-xs font-semibold tracking-wide transition-all duration-300 flex items-center space-x-2 ${
+                    isActive ? "glass-pill-active shadow-md scale-105" : "glass-pill text-white/80 hover:bg-white/10"
+                }`;
+                
+                // Map custom icon markers for visual cues
+                let flagIcon = "fa-city";
+                if (city.name === "Srinagar") flagIcon = "fa-mountain-sun";
+                if (city.name === "Mumbai") flagIcon = "fa-ship";
+                if (city.name === "Guwahati") flagIcon = "fa-bridge";
+                if (city.name === "Kochi") flagIcon = "fa-anchor";
+                
+                chip.innerHTML = `
+                    <i class="fa-solid ${flagIcon}"></i>
+                    <span>${city.name}</span>
+                `;
+                scroller.appendChild(chip);
+            });
+        }
+
+        // Preset Selector execution handler
+        function selectPresetCity(city) {
+            appState.currentCity = {
+                name: city.name,
+                lat: city.lat,
+                lon: city.lon,
+                region: city.region
+            };
+            renderPresetCities();
+            fetchWeatherData(appState.currentCity);
+            showMausamToast(`Displaying real-time records for ${city.name}.`, 'success');
+        }
+
+        // Tab routing execution
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+                tab.classList.remove('block');
+            });
+            document.getElementById(tabId).classList.remove('hidden');
+            document.getElementById(tabId).classList.add('block');
+
+            // Reset navigation tab indicators styles
+            const tabs = ['dashboard-tab', 'compare-tab', 'radar-tab'];
+            tabs.forEach(t => {
+                const button = document.getElementById(`nav-${t}`);
+                if (t === tabId) {
+                    button.className = "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-medium text-xs sm:text-sm glass-pill-active transition-all flex items-center space-x-1.5";
+                } else {
+                    button.className = "px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl font-medium text-xs sm:text-sm text-white/80 hover:bg-white/10 transition-all flex items-center space-x-1.5";
+                }
+            });
+
+            appState.currentTab = tabId;
+            if (tabId === 'compare-tab') {
+                renderCompareMatrix();
+            } else if (tabId === 'radar-tab') {
+                setTimeout(resizeRadarCanvas, 100);
+            }
+        }
+
+        // Global Toast Display Controller
+        function showMausamToast(message, type = 'info') {
+            const toast = document.getElementById("mausam-toast");
+            const messageBody = document.getElementById("toast-message-body");
+            const iconWrapper = document.getElementById("toast-icon-wrapper");
+
+            messageBody.innerText = message;
+            
+            if (type === 'success') {
+                iconWrapper.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i>`;
+            } else if (type === 'error') {
+                iconWrapper.innerHTML = `<i class="fa-solid fa-circle-xmark text-rose-400"></i>`;
+            } else {
+                iconWrapper.innerHTML = `<i class="fa-solid fa-circle-info text-blue-400"></i>`;
+            }
+
+            toast.classList.remove("translate-y-24", "opacity-0");
+            toast.classList.add("translate-y-0", "opacity-100");
+
+            setTimeout(() => {
+                toast.classList.remove("translate-y-0", "opacity-100");
+                toast.classList.add("translate-y-24", "opacity-0");
+            }, 3000);
+        }
+
+        // Search action callback
+        async function searchManualCity() {
+            const query = document.getElementById("city-search-input").value.trim();
+            if (!query) {
+                showMausamToast("Please specify a city name to search.", 'error');
+                return;
+            }
+
+            // Fetch coordinates utilizing Open-Meteo keyless geocoding API
+            const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+            try {
+                const response = await fetch(geocodeUrl);
+                const data = await response.json();
+                
+                if (data.results && data.results.length > 0) {
+                    const match = data.results[0];
+                    const searchState = match.admin1 || match.country || "India";
+                    
+                    appState.currentCity = {
+                        name: match.name,
+                        lat: match.latitude,
+                        lon: match.longitude,
+                        region: `${searchState}, India`
+                    };
+                    
+                    renderPresetCities();
+                    fetchWeatherData(appState.currentCity);
+                    showMausamToast(`Loaded ${match.name} coordinates from database.`, 'success');
+                } else {
+                    showMausamToast("No matching Indian region found. Try entering alternative spellings.", 'error');
+                }
+            } catch (error) {
+                console.error("Geocoding fetch exception: ", error);
+                showMausamToast("Subcontinent geocoding lookup timed out.", 'error');
+            }
+        }
+
+        // Handle enter keys
+        function handleSearchKey(event) {
+            if (event.key === "Enter") {
+                searchManualCity();
+            }
+        }
+
+        // Geolocation trigger using native browser support
+        function locateUserGeo() {
+            if (!navigator.geolocation) {
+                showMausamToast("Your browser does not support geolocation tracking.", 'error');
+                return;
+            }
+
+            showMausamToast("Detecting satellite coordinate connection...", "info");
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    // Call reverse geocoding to resolve city names
+                    const geocodeUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+                    let detectedName = "My Location";
+                    let detectedRegion = "Detected Coordinates";
+                    
+                    try {
+                        const geoResponse = await fetch(geocodeUrl);
+                        const geoData = await geoResponse.json();
+                        detectedName = geoData.city || geoData.locality || "My Location";
+                        detectedRegion = geoData.principalSubdivision || "India";
+                    } catch(e) {
+                        console.warn("Unable to fetch reverse geocode string details, falling back directly.");
+                    }
+
+                    appState.currentCity = {
+                        name: detectedName,
+                        lat: lat,
+                        lon: lon,
+                        region: `${detectedRegion}, India`
+                    };
+
+                    renderPresetCities();
+                    fetchWeatherData(appState.currentCity);
+                    showMausamToast(`Located! Displaying local weather parameters.`, 'success');
+                },
+                (error) => {
+                    showMausamToast("Geolocation access denied or timed out.", 'error');
+                }
+            );
+        }
+
+        // Fetch primary current weather & forecasts
+        async function fetchWeatherData(city) {
+            const apiForecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_probability_max&timezone=auto`;
+            
+            try {
+                const response = await fetch(apiForecastUrl);
+                if (!response.ok) throw new Error("Weather request failed.");
+                const data = await response.json();
+                
+                updateDashboardUI(data, city);
+                triggerAdvisorText(data, city);
+            } catch (err) {
+                console.error("Weather core fetch exception: ", err);
+                showMausamToast("Weather sync error. Confirm network settings.", 'error');
+            }
+        }
+
+        // Update Dashboard Elements directly
+        function updateDashboardUI(data, city) {
+            const current = data.current;
+            const daily = data.daily;
+            const hourly = data.hourly;
+            
+            // Resolve weather properties
+            const code = current.weather_code;
+            const weatherDef = weatherCodes[code] || { desc: "Unspecified Ambience", icon: "fa-cloud", theme: "cloudy", particles: "clouds" };
+            
+            // Sync hero panel
+            document.getElementById("hero-city-name").innerText = city.name;
+            document.getElementById("hero-state-region").innerText = city.region;
+            document.getElementById("hero-temp").innerText = Math.round(current.temperature_2m);
+            document.getElementById("hero-feels-like").innerText = `Feels like ${Math.round(current.apparent_temperature)}°C`;
+            document.getElementById("hero-temp-range").innerText = `H: ${Math.round(daily.temperature_2m_max[0])}°C  L: ${Math.round(daily.temperature_2m_min[0])}°C`;
+            
+            // Icon mapping
+            const iconNode = document.getElementById("hero-weather-icon");
+            iconNode.className = `fa-solid ${weatherDef.icon} text-6xl drop-shadow-[0_4px_12px_rgba(251,191,36,0.3)] block`;
+            
+            // Color glow setup matching icons
+            const glow = document.getElementById("glow-circle");
+            if (weatherDef.theme === 'sunny') {
+                iconNode.className = "fa-solid fa-sun text-6xl text-amber-400 drop-shadow-[0_4px_12px_rgba(251,191,36,0.4)] block animate-[spin_40s_linear_infinite]";
+                glow.className = "absolute -right-20 -bottom-20 w-56 h-56 rounded-full bg-amber-500/25 blur-3xl pointer-events-none";
+            } else if (weatherDef.theme === 'rainy') {
+                iconNode.className = "fa-solid fa-cloud-showers-heavy text-6xl text-blue-400 drop-shadow-[0_4px_12px_rgba(59,130,246,0.3)] block";
+                glow.className = "absolute -right-20 -bottom-20 w-56 h-56 rounded-full bg-blue-500/25 blur-3xl pointer-events-none";
+            } else if (weatherDef.theme === 'stormy') {
+                iconNode.className = "fa-solid fa-cloud-bolt text-6xl text-purple-400 drop-shadow-[0_4px_12px_rgba(168,85,247,0.3)] block";
+                glow.className = "absolute -right-20 -bottom-20 w-56 h-56 rounded-full bg-purple-500/20 blur-3xl pointer-events-none";
+            } else {
+                glow.className = "absolute -right-20 -bottom-20 w-56 h-56 rounded-full bg-slate-500/20 blur-3xl pointer-events-none";
+            }
+            
+            document.getElementById("hero-condition-desc").innerText = weatherDef.desc;
+            document.getElementById("hero-timezone-text").innerText = data.timezone;
+            
+            // Clock Sync formatted local time
+            const now = new Date();
+            document.getElementById("hero-local-time").innerText = `Checked at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+            // Sync atmospheric cards
+            document.getElementById("index-humidity").innerText = `${current.relative_humidity_2m}%`;
+            document.getElementById("index-wind").innerText = `${current.wind_speed_10m} km/h`;
+            document.getElementById("index-wind-direction").innerText = `${getWindDirectionText(current.wind_direction_10m)} (${current.wind_direction_10m}°)`;
+            
+            const uvIndex = daily.uv_index_max[0];
+            document.getElementById("index-uv").innerText = uvIndex.toFixed(1);
+            document.getElementById("index-uv-risk").innerText = getUvRiskLevelText(uvIndex);
+            
+            document.getElementById("index-precipitation").innerText = `${daily.precipitation_probability_max[0]}%`;
+
+            // Adjust overall background styling theme classes
+            document.body.className = `theme-${weatherDef.theme} text-white min-h-screen flex flex-col relative pb-12`;
+            setWeatherParticleMode(weatherDef.particles);
+
+            // Populate Dynamic Hourly Forecast Slider
+            renderHourlySlider(hourly);
+
+            // Populate Dynamic 7-day Forecast Module
+            renderWeeklyForecast(daily);
+        }
+
+        // Helper string resolvers for Wind Angles
+        function getWindDirectionText(deg) {
+            if (deg >= 337.5 || deg < 22.5) return "North";
+            if (deg >= 22.5 && deg < 67.5) return "Northeast";
+            if (deg >= 67.5 && deg < 112.5) return "East";
+            if (deg >= 112.5 && deg < 157.5) return "Southeast";
+            if (deg >= 157.5 && deg < 202.5) return "South";
+            if (deg >= 202.5 && deg < 247.5) return "Southwest";
+            if (deg >= 247.5 && deg < 292.5) return "West";
+            if (deg >= 292.5 && deg < 337.5) return "Northwest";
+            return "Variable";
+        }
+
+        // UV Level indicator text
+        function getUvRiskLevelText(uv) {
+            if (uv < 3) return "Low Risk (Safe)";
+            if (uv < 6) return "Moderate (Wear Hat)";
+            if (uv < 8) return "High (Wear Screen)";
+            if (uv < 11) return "Very High (Shield Up)";
+            return "Extreme (Avoid Sun)";
+        }
+
+        // Population execution for hourly swiper
+        function renderHourlySlider(hourly) {
+            const container = document.getElementById("hourly-forecast-container");
+            container.innerHTML = "";
+
+            // Display next 24 hourly metrics starting from the current hour index
+            const currentHourIndex = new Date().getHours();
+            
+            for (let i = currentHourIndex; i < currentHourIndex + 24; i++) {
+                if (i >= hourly.time.length) break;
+
+                const timeStr = hourly.time[i];
+                const temp = Math.round(hourly.temperature_2m[i]);
+                const code = hourly.weather_code[i];
+                const weatherDef = weatherCodes[code] || { icon: "fa-cloud" };
+
+                // Format hour label
+                const hourObj = new Date(timeStr);
+                let hourLabel = hourObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                // Active status highlighting for the immediate current hour
+                const isCurrent = (i === currentHourIndex);
+                
+                const card = document.createElement("div");
+                card.className = `flex-shrink-0 w-20 py-4 rounded-2xl flex flex-col items-center justify-between transition border ${
+                    isCurrent ? "bg-white/20 border-white/40 scale-105 shadow-md" : "bg-white/5 border-white/5 hover:bg-white/10"
+                }`;
+
+                card.innerHTML = `
+                    <span class="text-[10px] text-white/60 font-medium">${hourLabel}</span>
+                    <i class="fa-solid ${weatherDef.icon} text-lg my-2 text-amber-300"></i>
+                    <span class="text-sm font-bold">${temp}°</span>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        // Populate weekly layout elements
+        function renderWeeklyForecast(daily) {
+            const container = document.getElementById("weekly-forecast-container");
+            container.innerHTML = "";
+
+            const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+            for (let i = 0; i < 7; i++) {
+                const dateStr = daily.time[i];
+                const maxTemp = Math.round(daily.temperature_2m_max[i]);
+                const minTemp = Math.round(daily.temperature_2m_min[i]);
+                const code = daily.weather_code[i];
+                const rainChance = daily.precipitation_probability_max[i];
+                const weatherDef = weatherCodes[code] || { desc: "Partly Cloudy", icon: "fa-cloud" };
+
+                const dateObj = new Date(dateStr);
+                let dayLabel = daysOfWeek[dateObj.getDay()];
+                
+                // Highlight current day label
+                if (i === 0) dayLabel = "Today";
+
+                const row = document.createElement("div");
+                row.className = "flex items-center justify-between py-3 text-sm";
+                row.innerHTML = `
+                    <div class="w-1/4">
+                        <span class="font-bold text-white/95">${dayLabel}</span>
+                        <span class="block text-[10px] text-white/40">${dateObj.toLocaleDateString([], {month: 'short', day: 'numeric'})}</span>
+                    </div>
+                    <div class="flex items-center gap-2.5 w-2/5">
+                        <i class="fa-solid ${weatherDef.icon} text-amber-300 text-lg w-6 text-center"></i>
+                        <span class="text-xs text-white/80 font-medium truncate">${weatherDef.desc}</span>
+                    </div>
+                    <div class="flex items-center gap-3 w-1/4 justify-end">
+                        <span class="text-xs text-blue-300"><i class="fa-solid fa-umbrella text-[10px]"></i> ${rainChance}%</span>
+                        <div class="text-right">
+                            <span class="font-bold">${maxTemp}°</span>
+                            <span class="text-white/40 text-xs ml-1">${minTemp}°</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(row);
+            }
+        }
+
+        // Advisor message generator utilizing simple logic parameters for Indian contexts
+        function triggerAdvisorText(data, city) {
+            const current = data.current;
+            const temp = current.temperature_2m;
+            const humidity = current.relative_humidity_2m;
+            const wind = current.wind_speed_10m;
+            const code = current.weather_code;
+
+            let advice = "";
+
+            // Cold/Hill regions advice (Srinagar/Shimla context)
+            if (temp < 15) {
+                advice = `Expect colder alpine temperatures in ${city.name} (${Math.round(temp)}°C). It is highly advised to wear dual-layer thermal garments. Perfect weather to enjoy hot Kashmiri Kahwa. Be careful of early morning fog conditions.`;
+            } 
+            // Extreme hot dry conditions (North Indian summer)
+            else if (temp > 35) {
+                advice = `Extreme subcontinental warmth detected in ${city.name} (${Math.round(temp)}°C). Seek indoor shelter between 12 PM and 4 PM. Stay hydrated with local electrolytes or raw coconut water. Highly recommended to carry light umbrellas for sun UV protection.`;
+            } 
+            // Rainy/Monsoon/Cyclone advice
+            else if (code >= 51 && code <= 82) {
+                advice = `Active monsoon/rainfall currently active in ${city.name}. Keep your wet-weather rain gear ready. Potential traffic crawls and airline delay backlogs might form on routes. Ensure all electronics are safely sheltered.`;
+            } 
+            // Mild breezy beach weather
+            else if (humidity > 70 && temp > 28) {
+                advice = `High tropical humidity levels around ${city.name} typical of peninsular India. Seek coastal shade or air-conditioned environments during midday peak. Lightweight cotton threads are optimal.`;
+            } 
+            // Sunny pleasant conditions
+            else {
+                advice = `Delightful clear conditions around ${city.name} today. Beautiful conditions for local sightseeing, shopping, or executing travel schedules. Ensure minimal sun exposure parameters by layering sunscreen during peak hours.`;
+            }
+
+            document.getElementById("weather-recommendation-text").innerText = advice;
+        }
+
+        // ==========================================
+        // DYNAMIC CANVAS BACKGROUND IMPLEMENTATION
+        // ==========================================
+        let bgCanvas, bgCtx;
+        let bgParticles = [];
+        let activeParticleMode = "sun"; // sun, clouds, rain, fog, snow, storm
+        let animationFrameId;
+
+        function setupWeatherBackground() {
+            bgCanvas = document.getElementById("weather-bg-canvas");
+            bgCtx = bgCanvas.getContext("2d");
+            resizeWeatherCanvas();
+            animateWeatherParticles();
+        }
+
+        function resizeWeatherCanvas() {
+            if (bgCanvas) {
+                bgCanvas.width = window.innerWidth;
+                bgCanvas.height = window.innerHeight;
+                initWeatherParticles();
+            }
+        }
+
+        function setWeatherParticleMode(mode) {
+            if (activeParticleMode !== mode) {
+                activeParticleMode = mode;
+                initWeatherParticles();
+            }
+        }
+
+        // Reset particle arrays based on conditions
+        function initWeatherParticles() {
+            bgParticles = [];
+            const count = Math.min(Math.floor(bgCanvas.width / 15), 150);
+
+            if (activeParticleMode === "rain" || activeParticleMode === "storm") {
+                for (let i = 0; i < count * 1.5; i++) {
+                    bgParticles.push({
+                        x: Math.random() * bgCanvas.width,
+                        y: Math.random() * bgCanvas.height,
+                        length: Math.random() * 20 + 15,
+                        speed: Math.random() * 8 + 8,
+                        opacity: Math.random() * 0.3 + 0.1,
+                        wind: Math.random() * 2 - 1
+                    });
+                }
+            } else if (activeParticleMode === "snow") {
+                for (let i = 0; i < count; i++) {
+                    bgParticles.push({
+                        x: Math.random() * bgCanvas.width,
+                        y: Math.random() * bgCanvas.height,
+                        radius: Math.random() * 3 + 1,
+                        speed: Math.random() * 1.5 + 0.5,
+                        opacity: Math.random() * 0.5 + 0.2,
+                        swing: Math.random() * 2 * Math.PI,
+                        swingSpeed: Math.random() * 0.02
+                    });
+                }
+            } else if (activeParticleMode === "clouds" || activeParticleMode === "fog") {
+                const cloudCount = 12;
+                for (let i = 0; i < cloudCount; i++) {
+                    bgParticles.push({
+                        x: Math.random() * (bgCanvas.width + 400) - 200,
+                        y: Math.random() * (bgCanvas.height / 2),
+                        radius: Math.random() * 120 + 80,
+                        speed: Math.random() * 0.3 + 0.1,
+                        opacity: Math.random() * 0.06 + 0.02
+                    });
+                }
+            } else if (activeParticleMode === "sun") {
+                // Sun beams pulsing logic coordinates
+                bgParticles = [];
+            }
+        }
+
+        function animateWeatherParticles() {
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            if (activeParticleMode === "rain" || activeParticleMode === "storm") {
+                bgCtx.strokeStyle = "rgba(156, 163, 175, 0.5)";
+                bgCtx.lineWidth = 1.2;
+                bgParticles.forEach(p => {
+                    bgCtx.beginPath();
+                    bgCtx.moveTo(p.x, p.y);
+                    bgCtx.lineTo(p.x + p.wind, p.y + p.length);
+                    bgCtx.stroke();
+
+                    // Update positions
+                    p.y += p.speed;
+                    p.x += p.wind;
+
+                    if (p.y > bgCanvas.height) {
+                        p.y = -p.length;
+                        p.x = Math.random() * bgCanvas.width;
+                    }
+                });
+            } else if (activeParticleMode === "snow") {
+                bgCtx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                bgParticles.forEach(p => {
+                    bgCtx.beginPath();
+                    bgCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    bgCtx.fill();
+
+                    // Update positions
+                    p.y += p.speed;
+                    p.swing += p.swingSpeed;
+                    p.x += Math.sin(p.swing) * 0.5;
+
+                    if (p.y > bgCanvas.height) {
+                        p.y = -p.radius;
+                        p.x = Math.random() * bgCanvas.width;
+                    }
+                });
+            } else if (activeParticleMode === "clouds" || activeParticleMode === "fog") {
+                bgCtx.fillStyle = "rgba(203, 213, 225, 0.6)";
+                bgParticles.forEach(p => {
+                    bgCtx.beginPath();
+                    bgCtx.globalAlpha = p.opacity;
+                    bgCtx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                    bgCtx.fill();
+                    bgCtx.globalAlpha = 1.0; // Reset
+
+                    // Move horizontal drift
+                    p.x += p.speed;
+                    if (p.x - p.radius > bgCanvas.width) {
+                        p.x = -p.radius;
+                        p.y = Math.random() * (bgCanvas.height / 2);
+                    }
+                });
+            } else if (activeParticleMode === "sun") {
+                // Render a smooth pulsating sun ray from the top right
+                const gradient = bgCtx.createRadialGradient(
+                    bgCanvas.width - 50, 50, 0,
+                    bgCanvas.width - 50, 50, 400 + Math.sin(Date.now() * 0.001) * 30
+                );
+                gradient.addColorStop(0, "rgba(251, 191, 36, 0.12)");
+                gradient.addColorStop(0.5, "rgba(251, 191, 36, 0.04)");
+                gradient.addColorStop(1, "rgba(251, 191, 36, 0)");
+                
+                bgCtx.fillStyle = gradient;
+                bgCtx.beginPath();
+                bgCtx.arc(bgCanvas.width - 50, 50, 500, 0, Math.PI * 2);
+                bgCtx.fill();
+            }
+
+            animationFrameId = requestAnimationFrame(animateWeatherParticles);
+        }
+
+        // ==========================================
+        // TAB 2: SIDE-BY-SIDE COMPARE ENGINE
+        // ==========================================
+        function handleCompareKey(event) {
+            if (event.key === "Enter") {
+                manualCompareAdd();
+            }
+        }
+
+        async function manualCompareAdd() {
+            const input = document.getElementById("compare-city-input");
+            const query = input.value.trim();
+            if (!query) return;
+            
+            input.value = "";
+            addCityToCompare(query);
+        }
+
+        async function addCityToCompare(cityName) {
+            // Avoid duplicates
+            if (appState.compareCities.some(c => c.toLowerCase() === cityName.toLowerCase())) {
+                showMausamToast(`${cityName} is already featured in the matrix board.`, 'info');
+                return;
+            }
+
+            // Verify with Geocoding before pushing
+            const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=1&language=en&format=json`;
+            try {
+                const response = await fetch(geocodeUrl);
+                const data = await response.json();
+                if (data.results && data.results.length > 0) {
+                    const matchName = data.results[0].name;
+                    appState.compareCities.push(matchName);
+                    renderCompareMatrix();
+                    showMausamToast(`Appended ${matchName} to structural dashboard comparison!`, 'success');
+                } else {
+                    showMausamToast("City location not resolved.", "error");
+                }
+            } catch(e) {
+                showMausamToast("Search process interrupted.", "error");
+            }
+        }
+
+        async function renderCompareMatrix() {
+            const tbody = document.getElementById("compare-matrix-rows");
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-xs text-white/50"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Processing subcontinental weather systems...</td></tr>`;
+
+            if (appState.compareCities.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-xs text-white/50">Your comparison list is empty. Add cities above!</td></tr>`;
+                return;
+            }
+
+            let rowsHTML = "";
+
+            // Call API simultaneously for all cities inside state list
+            const promises = appState.compareCities.map(async (city) => {
+                const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+                try {
+                    const geoRes = await fetch(geocodeUrl);
+                    const geoData = await geoRes.json();
+                    if (!geoData.results || geoData.results.length === 0) return null;
+                    
+                    const match = geoData.results[0];
+                    const lat = match.latitude;
+                    const lon = match.longitude;
+
+                    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,cloud_cover&timezone=auto`;
+                    const forecastRes = await fetch(forecastUrl);
+                    const forecastData = await forecastRes.json();
+
+                    return {
+                        name: match.name,
+                        region: match.admin1 || "India",
+                        current: forecastData.current
+                    };
+                } catch(e) {
+                    return null;
+                }
+            });
+
+            const results = await Promise.all(promises);
+            tbody.innerHTML = "";
+
+            results.forEach((res, index) => {
+                if (!res) return;
+                
+                const cur = res.current;
+                const weatherDef = weatherCodes[cur.weather_code] || { desc: "Cloudy", icon: "fa-cloud" };
+                const tempRound = Math.round(cur.temperature_2m);
+                const feelsRound = Math.round(cur.apparent_temperature);
+
+                const tr = document.createElement("tr");
+                tr.className = "border-b border-white/5 hover:bg-white/5 text-xs transition";
+                tr.innerHTML = `
+                    <td class="py-4 px-4 font-bold">
+                        <div>${res.name}</div>
+                        <div class="text-[10px] text-white/40 font-normal">${res.region}</div>
+                    </td>
+                    <td class="py-4 px-4">
+                        <span class="flex items-center gap-1.5 font-medium text-white/90">
+                            <i class="fa-solid ${weatherDef.icon} text-amber-300"></i>
+                            ${weatherDef.desc}
+                        </span>
+                    </td>
+                    <td class="py-4 px-4 text-sm font-extrabold text-white">${tempRound}°C</td>
+                    <td class="py-4 px-4 text-white/80">${feelsRound}°C</td>
+                    <td class="py-4 px-4 text-blue-300">${cur.relative_humidity_2m}%</td>
+                    <td class="py-4 px-4 text-teal-300">${cur.wind_speed_10m} km/h</td>
+                    <td class="py-4 px-4 text-white/70">${cur.cloud_cover}%</td>
+                    <td class="py-4 px-4 text-center">
+                        <button onclick="removeCompareCity('${res.name}')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 px-2.5 py-1.5 rounded-lg transition text-[10px] font-bold">
+                            <i class="fa-regular fa-trash-can"></i> Remove
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function removeCompareCity(name) {
+            appState.compareCities = appState.compareCities.filter(c => c.toLowerCase() !== name.toLowerCase());
+            renderCompareMatrix();
+            showMausamToast(`Removed ${name} from matrix.`, 'info');
+        }
+
+        // ==========================================
+        // TAB 3: SIMULATED INDIA RADAR ENGINE
+        // ==========================================
+        let radarCanvas, radarCtx;
+        let radarCities = [
+            { name: "Srinagar", x: 230, y: 70, temp: 14, cond: "Cold" },
+            { name: "New Delhi", x: 270, y: 155, temp: 32, cond: "Hot" },
+            { name: "Guwahati", x: 570, y: 195, temp: 24, cond: "Rain" },
+            { name: "Mumbai", x: 195, y: 325, temp: 29, cond: "Humid" },
+            { name: "Bengaluru", x: 285, y: 440, temp: 26, cond: "Clear" },
+            { name: "Kolkata", x: 470, y: 220, temp: 31, cond: "Humid" },
+            { name: "Chennai", x: 335, y: 445, temp: 34, cond: "Warm" },
+            { name: "Kochi", x: 250, y: 505, temp: 28, cond: "Rain" }
+        ];
+        
+        let mapSweepAngle = 0;
+        let radarActiveWaves = [];
+
+        function setupIndiaRadar() {
+            radarCanvas = document.getElementById("india-radar-canvas");
+            radarCtx = radarCanvas.getContext("2d");
+            resizeRadarCanvas();
+
+            // Setup hover coordinate tracker listener
+            radarCanvas.addEventListener('mousemove', (e) => {
+                const rect = radarCanvas.getBoundingClientRect();
+                const scaleX = radarCanvas.width / rect.width;
+                const scaleY = radarCanvas.height / rect.height;
+                const canvasX = (e.clientX - rect.left) * scaleX;
+                const canvasY = (e.clientY - rect.top) * scaleY;
+                
+                // Map coordinates back into standard coordinates format
+                const estLat = (36 - (canvasY / radarCanvas.height) * 28).toFixed(2);
+                const estLon = (68 + (canvasX / radarCanvas.width) * 30).toFixed(2);
+                document.getElementById("radar-coordinate-display").innerHTML = `Lat: ${estLat}° N, Lon: ${estLon}° E`;
+            });
+
+            // Start Radar loop animations
+            animateIndiaRadar();
+        }
+
+        function resizeRadarCanvas() {
+            if (radarCanvas) {
+                // Ensure correct relative sizing fit
+                radarCanvas.width = 640;
+                radarCanvas.height = 560;
+            }
+        }
+
+        function toggleRadarGrid() {
+            appState.radarShowGrid = !appState.radarShowGrid;
+            showMausamToast(appState.radarShowGrid ? "Pressure isobars visible." : "Pressure isobars hidden.", 'info');
+        }
+
+        function triggerRadarPulse() {
+            radarActiveWaves.push({
+                x: 320,
+                y: 280,
+                radius: 10,
+                maxRadius: 400,
+                opacity: 0.8
+            });
+            showMausamToast("Doppler sweep pulse triggered across all radar sectors.", 'success');
+        }
+
+        // Primary radar draw cycle loop
+        function animateIndiaRadar() {
+            if (appState.currentTab === 'radar-tab' && radarCtx) {
+                radarCtx.clearRect(0, 0, radarCanvas.width, radarCanvas.height);
+
+                // Draw background grid
+                radarCtx.strokeStyle = "rgba(99, 102, 241, 0.08)";
+                radarCtx.lineWidth = 1;
+                const step = 40;
+                for (let x = 0; x < radarCanvas.width; x += step) {
+                    radarCtx.beginPath();
+                    radarCtx.moveTo(x, 0);
+                    radarCtx.lineTo(x, radarCanvas.height);
+                    radarCtx.stroke();
+                }
+                for (let y = 0; y < radarCanvas.height; y += step) {
+                    radarCtx.beginPath();
+                    radarCtx.moveTo(0, y);
+                    radarCtx.lineTo(radarCanvas.width, y);
+                    radarCtx.stroke();
+                }
+
+                // Draw Isobars/Range Circles (centered at Indian subcontinent geographic mid point approx)
+                if (appState.radarShowGrid) {
+                    radarCtx.strokeStyle = "rgba(99, 102, 241, 0.15)";
+                    radarCtx.lineWidth = 1;
+                    const centerPointX = 320;
+                    const centerPointY = 280;
+                    for (let r = 80; r < 480; r += 80) {
+                        radarCtx.beginPath();
+                        radarCtx.arc(centerPointX, centerPointY, r, 0, Math.PI * 2);
+                        radarCtx.stroke();
+                        
+                        // Label kilometers range
+                        radarCtx.fillStyle = "rgba(255, 255, 255, 0.2)";
+                        radarCtx.font = "8px Inter";
+                        radarCtx.fillText(`${r * 2} km`, centerPointX + r - 15, centerPointY - 5);
+                    }
+                }
+
+                // Draw outline silhouette representation of India landmass roughly
+                drawSubcontinentPath();
+
+                // Process Active Doppler Waves Pulse Waves
+                radarActiveWaves.forEach((w, idx) => {
+                    radarCtx.strokeStyle = `rgba(16, 185, 129, ${w.opacity})`;
+                    radarCtx.lineWidth = 2;
+                    radarCtx.beginPath();
+                    radarCtx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
+                    radarCtx.stroke();
+
+                    w.radius += 3;
+                    w.opacity -= 0.008;
+
+                    if (w.opacity <= 0) {
+                        radarActiveWaves.splice(idx, 1);
+                    }
+                });
+
+                // Radar Sweeper Sweep Radial glow line
+                mapSweepAngle += 0.012;
+                const centerX = 320;
+                const centerY = 280;
+                const sweepLen = 380;
+                const targetX = centerX + Math.cos(mapSweepAngle) * sweepLen;
+                const targetY = centerY + Math.sin(mapSweepAngle) * sweepLen;
+
+                // Render Radial Sweep Line
+                radarCtx.strokeStyle = "rgba(16, 185, 129, 0.18)";
+                radarCtx.lineWidth = 2.5;
+                radarCtx.beginPath();
+                radarCtx.moveTo(centerX, centerY);
+                radarCtx.lineTo(targetX, targetY);
+                radarCtx.stroke();
+
+                // Draw Indian City Nodes onto the map space
+                radarCities.forEach(city => {
+                    // Check if map sweep currently overlaps city space to trigger small animations
+                    const dx = city.x - centerX;
+                    const dy = city.y - centerY;
+                    const cityAngle = Math.atan2(dy, dx);
+                    
+                    // Standardize sweep angle wrapping checks
+                    const diff = Math.abs(cityAngle - (mapSweepAngle % (Math.PI * 2)));
+                    const isOverlapped = diff < 0.12 || Math.abs(diff - Math.PI * 2) < 0.12;
+
+                    // Resolve temperature gradient colors
+                    let thermalColor = "rgba(16, 185, 129, 0.8)"; // green baseline
+                    if (city.temp >= 32) thermalColor = "rgba(239, 68, 68, 0.8)"; // Red
+                    else if (city.temp >= 26) thermalColor = "rgba(249, 115, 22, 0.8)"; // Orange
+                    else if (city.temp < 20) thermalColor = "rgba(59, 130, 246, 0.8)"; // Blue
+
+                    // Glow circle on overlap
+                    if (isOverlapped) {
+                        radarCtx.fillStyle = thermalColor.replace('0.8', '0.25');
+                        radarCtx.beginPath();
+                        radarCtx.arc(city.x, city.y, 22, 0, Math.PI * 2);
+                        radarCtx.fill();
+                    }
+
+                    // Static Node Center
+                    radarCtx.fillStyle = thermalColor;
+                    radarCtx.beginPath();
+                    radarCtx.arc(city.x, city.y, 6, 0, Math.PI * 2);
+                    radarCtx.fill();
+
+                    // Text parameters
+                    radarCtx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                    radarCtx.font = "bold 9px Inter";
+                    radarCtx.fillText(`${city.name}`, city.x + 10, city.y - 4);
+                    
+                    radarCtx.fillStyle = "rgba(255, 255, 255, 0.5)";
+                    radarCtx.font = "8px Inter";
+                    radarCtx.fillText(`${city.temp}°C • ${city.cond}`, city.x + 10, city.y + 6);
+                });
+            }
+
+            requestAnimationFrame(animateIndiaRadar);
+        }
+
+        // Draw approximate Indian Coastline & Borders lines roughly on map coordinates to provide context
+        function drawSubcontinentPath() {
+            radarCtx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+            radarCtx.lineWidth = 1.5;
+            radarCtx.beginPath();
+            
+            // Kashmir Node (North)
+            radarCtx.moveTo(230, 50);
+            
+            // Nepal boundary curve representation
+            radarCtx.lineTo(290, 80);
+            radarCtx.lineTo(380, 150);
+            
+            // Northeast boundary representation
+            radarCtx.lineTo(440, 160);
+            radarCtx.lineTo(500, 140);
+            radarCtx.lineTo(580, 180);
+            radarCtx.lineTo(560, 240);
+            radarCtx.lineTo(470, 230); // Bangladesh slot
+            
+            // East coast slope downwards
+            radarCtx.lineTo(450, 280);
+            radarCtx.lineTo(370, 380);
+            radarCtx.lineTo(340, 480);
+            
+            // Southern tip (Kanyakumari area)
+            radarCtx.lineTo(290, 530);
+            
+            // Malabar west coast slopes up
+            radarCtx.lineTo(240, 440);
+            radarCtx.lineTo(200, 320);
+            radarCtx.lineTo(150, 250); // Gujarat Gulf curves
+            radarCtx.lineTo(130, 220);
+            radarCtx.lineTo(180, 200);
+            
+            // Rajasthan borders back north
+            radarCtx.lineTo(190, 130);
+            
+            radarCtx.closePath();
+            radarCtx.stroke();
+            
+            // Add soft atmospheric fill
+            radarCtx.fillStyle = "rgba(99, 102, 241, 0.02)";
+            radarCtx.fill();
+        }
+    </script>
+</body>
+</html>
